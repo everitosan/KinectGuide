@@ -67,7 +67,7 @@ namespace KinnectGuide
             if (Ksensor != null && !Ksensor.IsRunning)
             {
                 Ksensor.Start();
-                Ksensor.ColorStream.Enable();
+                Ksensor.ColorStream.Enable(ColorImageFormat.InfraredResolution640x480Fps30);
                 Ksensor.ColorFrameReady += Ksensor_ColorFrameReady;
                 SetKinectInfo();
             }
@@ -87,10 +87,11 @@ namespace KinnectGuide
         public WriteableBitmap getColorImageFromKinect(ColorImageFrame mColorImageFrame)
         {
             var pixelData = new byte[mColorImageFrame.PixelDataLength];
+            int stride = mColorImageFrame.Width * mColorImageFrame.BytesPerPixel;
             WriteableBitmap mWriteableBitmap;
             mColorImageFrame.CopyPixelDataTo(pixelData);
-            mWriteableBitmap = new WriteableBitmap(Ksensor.ColorStream.FrameWidth, Ksensor.ColorStream.FrameHeight, 96.0, 96.0, PixelFormats.Bgr32, null);
-            mWriteableBitmap.WritePixels( new Int32Rect(0,0, mWriteableBitmap.PixelWidth, mWriteableBitmap.PixelHeight), pixelData, mWriteableBitmap.PixelWidth * sizeof(int), 0 );
+            mWriteableBitmap = new WriteableBitmap(Ksensor.ColorStream.FrameWidth, Ksensor.ColorStream.FrameHeight, 96.0, 96.0, PixelFormats.Gray16, null);
+            mWriteableBitmap.WritePixels( new Int32Rect(0,0, mWriteableBitmap.PixelWidth, mWriteableBitmap.PixelHeight), pixelData,stride, 0 );
             return mWriteableBitmap;
         }
 
