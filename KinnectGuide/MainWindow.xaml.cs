@@ -36,6 +36,7 @@ namespace KinnectGuide
                 Ksensor = KinectSensor.KinectSensors[0];
                 KinectSensor.KinectSensors.StatusChanged += KinectSensors_StatusChanged;
                 stopButton.IsEnabled = false;
+                angleBox.IsEnabled = false;
             }
             else {
                 MessageBox.Show("No hay kinect conectado");
@@ -67,11 +68,30 @@ namespace KinnectGuide
             {
                 Ksensor.Start();
                 Ksensor.ColorStream.Enable();
-                Ksensor.DepthStream.Enable();
-                Ksensor.SkeletonStream.Enable();
+                Ksensor.ColorFrameReady += Ksensor_ColorFrameReady;
                 SetKinectInfo();
             }
 
+        }
+
+        private void Ksensor_ColorFrameReady(object sender, ColorImageFrameReadyEventArgs e)
+        {
+            using (ColorImageFrame mColorImageFrame = e.OpenColorImageFrame())
+            {
+                if (mColorImageFrame == null)
+                    return;
+                imageWindow.Source = getColorImageFromKinect(mColorImageFrame);
+            }
+        }
+
+        public WriteableBitmap getColorImageFromKinect(ColorImageFrame mColorImageFrame)
+        {
+            var pixelData = new byte[mColorImageFrame.PixelDataLength];
+            WriteableBitmap mWriteableBitmap;
+            mColorImageFrame.CopyPixelDataTo(pixelData);
+            mWriteableBitmap = new WriteableBitmap(Ksensor.ColorStream.FrameWidth, Ksensor.ColorStream.FrameHeight, 96.0, 96.0, PixelFormats.Bgr32, null);
+            mWriteableBitmap.WritePixels( new Int32Rect(0,0, mWriteableBitmap.PixelWidth, mWriteableBitmap.PixelHeight), pixelData, mWriteableBitmap.PixelWidth * sizeof(int), 0 );
+            return mWriteableBitmap;
         }
 
         private void stopSensor()
@@ -84,6 +104,7 @@ namespace KinnectGuide
         {
             startButton.IsEnabled = true;
             stopButton.IsEnabled = false;
+            angleBox.IsEnabled = false;
             stopSensor();
         }
 
@@ -91,7 +112,29 @@ namespace KinnectGuide
         {
             stopButton.IsEnabled = true;
             startButton.IsEnabled = false;
+            angleBox.IsEnabled = true;
             startSensor();
+        }
+
+        private void textBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            int angle = 0;
+            bool parsed = Int32.TryParse(angleBox.Text, out angle);
+
+            if (Ksensor != null && parsed)
+                if (angle < Ksensor.MaxElevationAngle && angle > Ksensor.MinElevationAngle)
+                {
+                    try
+                    {
+                        Ksensor.ElevationAngle = angle;
+                    }
+                   catch (InvalidOperationException ex)
+                    {
+                        
+                    }
+                }
+                    
+            
         }
     }
 }
