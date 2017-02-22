@@ -1,19 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 using Microsoft.Kinect;
+using Coding4Fun.Kinect.Wpf;
 
 namespace KinnectGuide
 {
@@ -68,10 +60,33 @@ namespace KinnectGuide
             {
                 Ksensor.Start();
                 Ksensor.ColorStream.Enable(ColorImageFormat.InfraredResolution640x480Fps30);
-                Ksensor.ColorFrameReady += Ksensor_ColorFrameReady;
+                //Ksensor.ColorFrameReady += Ksensor_ColorFrameReady;
+                Ksensor.DepthFrameReady += new EventHandler<DepthImageFrameReadyEventArgs>(sensor_DepthFrameReady);
                 SetKinectInfo();
             }
 
+        }
+
+        private void sensor_DepthFrameReady(object sender, DepthImageFrameReadyEventArgs e)
+        {
+            using ( DepthImageFrame mDepthImageFrame = e.OpenDepthImageFrame() )
+            {
+                if (mDepthImageFrame == null)
+                    return;
+                imageWindow.Source = getDepthImageFrame(mDepthImageFrame);
+            }
+        }
+
+        private ImageSource getDepthImageFrame(DepthImageFrame mDepthImageFrame)
+        {
+            WriteableBitmap mWriteableBitmap;
+            short[] pixelData = new short[mDepthImageFrame.PixelDataLength];
+            int stride = mDepthImageFrame.Width * 2;
+            mDepthImageFrame.CopyPixelDataTo(pixelData);
+            mWriteableBitmap = new WriteableBitmap(Ksensor.DepthStream.FrameWidth, Ksensor.DepthStream.FrameHeight, 96, 96, PixelFormats.Gray16, null);
+            mWriteableBitmap.WritePixels(new Int32Rect(0, 0, mWriteableBitmap.PixelWidth, mWriteableBitmap.PixelHeight), pixelData, stride, 0);
+
+            return mWriteableBitmap;
         }
 
         private void Ksensor_ColorFrameReady(object sender, ColorImageFrameReadyEventArgs e)
@@ -83,7 +98,7 @@ namespace KinnectGuide
                 imageWindow.Source = getColorImageFromKinect(mColorImageFrame);
             }
         }
-
+        
         public WriteableBitmap getColorImageFromKinect(ColorImageFrame mColorImageFrame)
         {
             var pixelData = new byte[mColorImageFrame.PixelDataLength];
