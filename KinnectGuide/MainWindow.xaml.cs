@@ -61,6 +61,7 @@ namespace KinnectGuide
                 Ksensor.Start();
                 Ksensor.ColorStream.Enable(ColorImageFormat.InfraredResolution640x480Fps30);
                 //Ksensor.ColorFrameReady += Ksensor_ColorFrameReady;
+                Ksensor.DepthStream.Enable(DepthImageFormat.Resolution640x480Fps30);
                 Ksensor.DepthFrameReady += new EventHandler<DepthImageFrameReadyEventArgs>(sensor_DepthFrameReady);
                 SetKinectInfo();
             }
