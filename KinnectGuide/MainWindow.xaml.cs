@@ -5,7 +5,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 using Microsoft.Kinect;
-using Coding4Fun.Kinect.Wpf;
+using System.Linq;
+using TobiasErichsen.teVirtualMIDI;
 
 namespace KinnectGuide
 {
@@ -13,6 +14,8 @@ namespace KinnectGuide
     {
         private KinectSensor Ksensor;
         private MainWindowViewModel viewModel;
+        public static TeVirtualMIDI vPort;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -29,6 +32,7 @@ namespace KinnectGuide
                 KinectSensor.KinectSensors.StatusChanged += KinectSensors_StatusChanged;
                 stopButton.IsEnabled = false;
                 angleBox.IsEnabled = false;
+                TestMidi.IsEnabled = false;
             }
             else {
                 MessageBox.Show("No hay kinect conectado");
@@ -59,47 +63,46 @@ namespace KinnectGuide
             if (Ksensor != null && !Ksensor.IsRunning)
             {
                 Ksensor.Start();
-                Ksensor.ColorStream.Enable(ColorImageFormat.InfraredResolution640x480Fps30);
-                //Ksensor.ColorFrameReady += Ksensor_ColorFrameReady;
-                Ksensor.DepthStream.Enable(DepthImageFormat.Resolution640x480Fps30);
-                Ksensor.DepthFrameReady += new EventHandler<DepthImageFrameReadyEventArgs>(sensor_DepthFrameReady);
+                Ksensor.SkeletonStream.Enable();
+                Ksensor.SkeletonFrameReady += Ksensor_SkeletonFrameReady;
                 SetKinectInfo();
+                vPort = new TeVirtualMIDI("KinectMIDI");
             }
 
         }
 
-        private void sensor_DepthFrameReady(object sender, DepthImageFrameReadyEventArgs e)
+        private void Ksensor_SkeletonFrameReady(object sender, SkeletonFrameReadyEventArgs e)
         {
-            using ( DepthImageFrame mDepthImageFrame = e.OpenDepthImageFrame() )
+            Skeleton[] totalSkeletons = new Skeleton[6];
+            using (SkeletonFrame mSkeletonFrame = e.OpenSkeletonFrame())
             {
-                if (mDepthImageFrame == null)
+                if (mSkeletonFrame == null)
                     return;
-                imageWindow.Source = getDepthImageFrame(mDepthImageFrame);
+                mSkeletonFrame.CopySkeletonDataTo(totalSkeletons);
+                Skeleton firstSkeleton = (from trackedSkeleton in totalSkeletons where trackedSkeleton.TrackingState == SkeletonTrackingState.Tracked select trackedSkeleton).FirstOrDefault();
+
+                if (firstSkeleton == null)
+                    return;
+                if (firstSkeleton.Joints[JointType.HandRight].TrackingState == JointTrackingState.Tracked)
+                {
+                    this.MapJointsWithUIElement(firstSkeleton);
+                }
             }
         }
 
-        private ImageSource getDepthImageFrame(DepthImageFrame mDepthImageFrame)
+        private void MapJointsWithUIElement( Skeleton sk )
         {
-            WriteableBitmap mWriteableBitmap;
-            short[] pixelData = new short[mDepthImageFrame.PixelDataLength];
-            int stride = mDepthImageFrame.Width * 2;
-            mDepthImageFrame.CopyPixelDataTo(pixelData);
-            mWriteableBitmap = new WriteableBitmap(Ksensor.DepthStream.FrameWidth, Ksensor.DepthStream.FrameHeight, 96, 96, PixelFormats.Gray16, null);
-            mWriteableBitmap.WritePixels(new Int32Rect(0, 0, mWriteableBitmap.PixelWidth, mWriteableBitmap.PixelHeight), pixelData, stride, 0);
-
-            return mWriteableBitmap;
+            Point mappedPoint = this.ScalePosition(sk.Joints[JointType.HandRight].Position);
+            Canvas.SetLeft(righthand, mappedPoint.X);
+            Canvas.SetTop(righthand, mappedPoint.Y);
         }
 
-        private void Ksensor_ColorFrameReady(object sender, ColorImageFrameReadyEventArgs e)
+        private Point ScalePosition(SkeletonPoint skPoint)
         {
-            using (ColorImageFrame mColorImageFrame = e.OpenColorImageFrame())
-            {
-                if (mColorImageFrame == null)
-                    return;
-                imageWindow.Source = getColorImageFromKinect(mColorImageFrame);
-            }
+            DepthImagePoint depthPoint = Ksensor.CoordinateMapper.MapSkeletonPointToDepthPoint(skPoint, DepthImageFormat.Resolution640x480Fps30);
+            return new Point(depthPoint.X, depthPoint.Y);
         }
-        
+
         public WriteableBitmap getColorImageFromKinect(ColorImageFrame mColorImageFrame)
         {
             var pixelData = new byte[mColorImageFrame.PixelDataLength];
@@ -122,7 +125,9 @@ namespace KinnectGuide
             startButton.IsEnabled = true;
             stopButton.IsEnabled = false;
             angleBox.IsEnabled = false;
+            TestMidi.IsEnabled = false;
             stopSensor();
+            vPort.shutdown();
         }
 
         private void StartSensor(object sender, RoutedEventArgs e)
@@ -131,6 +136,11 @@ namespace KinnectGuide
             startButton.IsEnabled = false;
             angleBox.IsEnabled = true;
             startSensor();
+            TestMidi.IsEnabled = true;
+        }
+        private void SendMidi(object sender, RoutedEventArgs e) {
+            var midimessage = new byte[] { 144, 103, 100};
+            vPort.sendCommand(midimessage);
         }
 
         private void textBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -153,5 +163,7 @@ namespace KinnectGuide
                     
             
         }
+
+        
     }
 }
