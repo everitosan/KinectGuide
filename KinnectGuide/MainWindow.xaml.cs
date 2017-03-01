@@ -7,6 +7,7 @@ using System.Windows.Media.Imaging;
 using Microsoft.Kinect;
 using System.Linq;
 using TobiasErichsen.teVirtualMIDI;
+using System.Windows.Threading;
 
 namespace KinnectGuide
 {
@@ -15,6 +16,9 @@ namespace KinnectGuide
         private KinectSensor Ksensor;
         private MainWindowViewModel viewModel;
         public static TeVirtualMIDI vPort;
+        DispatcherTimer dispatcher;
+        Point[] mappedPoint = new Point [20];
+
 
         public MainWindow()
         {
@@ -22,6 +26,20 @@ namespace KinnectGuide
             Loaded += MainWindow_Loaded;
             viewModel = new MainWindowViewModel();
             DataContext = viewModel;
+            dispatcher = new DispatcherTimer();
+            dispatcher.Interval = new TimeSpan(0, 0, 1);
+            dispatcher.Tick += patronFilter;
+        }
+
+        private void patronFilter(object sender, EventArgs e)
+        {
+            if (mappedPoint == null)
+                return;
+            if (mappedPoint[0].X > 300 && mappedPoint[0].Y > 100)
+            {
+                var midimessage = new byte[] { 144, (byte) mappedPoint[1].Y , 100 };
+                vPort.sendCommand(midimessage);
+            }
         }
 
         protected void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -30,6 +48,7 @@ namespace KinnectGuide
             {
                 Ksensor = KinectSensor.KinectSensors[0];
                 KinectSensor.KinectSensors.StatusChanged += KinectSensors_StatusChanged;
+                viewModel.trackedStatus = "Not tracked";
                 stopButton.IsEnabled = false;
                 angleBox.IsEnabled = false;
                 TestMidi.IsEnabled = false;
@@ -82,19 +101,35 @@ namespace KinnectGuide
                 Skeleton firstSkeleton = (from trackedSkeleton in totalSkeletons where trackedSkeleton.TrackingState == SkeletonTrackingState.Tracked select trackedSkeleton).FirstOrDefault();
 
                 if (firstSkeleton == null)
+                {
+                    viewModel.trackedStatus = "Not Tracked";
+                    dispatcher.Stop();
                     return;
+                }
+
+                if (!dispatcher.IsEnabled)
+                    dispatcher.Start();
+                viewModel.trackedStatus = "Trakced";
+
                 if (firstSkeleton.Joints[JointType.HandRight].TrackingState == JointTrackingState.Tracked)
                 {
-                    this.MapJointsWithUIElement(firstSkeleton);
+                    mappedPoint[0] = this.ScalePosition(firstSkeleton.Joints[JointType.HandRight].Position);
+                    this.MapJointsWithUIElement(mappedPoint[0], RightHand, rHandPosition);
+                }
+
+                if (firstSkeleton.Joints[JointType.HandLeft].TrackingState == JointTrackingState.Tracked)
+                {
+                    mappedPoint[1] = this.ScalePosition(firstSkeleton.Joints[JointType.HandLeft].Position);
+                    this.MapJointsWithUIElement(mappedPoint[1], LeftHand, rLeftPosition);
                 }
             }
         }
 
-        private void MapJointsWithUIElement( Skeleton sk )
+        private void MapJointsWithUIElement( Point mPoint, StackPanel panel, Label text)
         {
-            Point mappedPoint = this.ScalePosition(sk.Joints[JointType.HandRight].Position);
-            Canvas.SetLeft(righthand, mappedPoint.X);
-            Canvas.SetTop(righthand, mappedPoint.Y);
+            Canvas.SetLeft(panel, mPoint.X);
+            Canvas.SetTop(panel, mPoint.Y);
+            text.Content = $"x: {mPoint.X}, Y:{mPoint.Y}";
         }
 
         private Point ScalePosition(SkeletonPoint skPoint)

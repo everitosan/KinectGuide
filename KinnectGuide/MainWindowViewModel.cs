@@ -26,6 +26,17 @@ namespace KinnectGuide
             }
         }
 
+        private string trackedStatusValue;
+        public string trackedStatus {
+            get { return trackedStatusValue; }
+            set { if (trackedStatusValue != value)
+                {
+                    trackedStatusValue = value;
+                    OnNotifyPropertyChange("trackedStatus");
+                }
+            }
+        }
+
         public void OnNotifyPropertyChange(string PropertyName)
         {
             if (this.PropertyChanged != null) {
